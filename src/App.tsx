@@ -245,6 +245,69 @@ export default function App() {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
 
+  const calculatedKpis = useMemo(() => {
+    const total_designs = data.designs.length;
+    const total_qty = data.batches.reduce((sum, b) => sum + (b.qty || 0), 0);
+    const total_dispatched = data.fg_stock.reduce((sum, s) => sum + (s.dispatched || 0), 0);
+    const fabric_value = data.fabric_purchase.reduce((sum, f) => sum + (f.amount || 0), 0);
+    const karigar_pending = data.karigar_ledger.reduce((sum, k) => sum + (k.balance || 0), 0);
+    const total_payments = data.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const active_batches = data.batches.filter(b => b.status === 'In Progress' || b.status === 'Active').length;
+    const grn_value = data.grn.reduce((sum, g) => sum + (g.amount || 0), 0);
+    const ar_outstanding = data.customers.reduce((sum, c) => sum + (c.balance || 0), 0);
+
+    return {
+      total_designs,
+      total_qty,
+      total_dispatched,
+      fabric_value,
+      karigar_pending,
+      total_payments,
+      active_batches,
+      grn_value,
+      ar_outstanding
+    };
+  }, [data]);
+
+  const productionData = useMemo(() => {
+    const depts = [
+      { key: "dyeing", full: "Dyeing", dept: "#Dyei" },
+      { key: "print", full: "Print", dept: "#Prnt" },
+      { key: "embr", full: "Embroidery", dept: "#Embr" },
+      { key: "cutt", full: "Cutting", dept: "#Cutt" },
+      { key: "handwork", full: "Handwork", dept: "#Hand" },
+      { key: "stitching", full: "Stitching", dept: "#Stitc" },
+      { key: "qc", full: "QC", dept: "#QC" },
+      { key: "pressing", dept: "#Press", full: "Pressing" }
+    ];
+
+    return depts.map(d => {
+      const issued = data.batches.filter(b => b.stage === d.full).reduce((sum, b) => sum + (b.qty || 0), 0);
+      const received = data.fg_stock.filter(s => s.design === d.full).reduce((sum, s) => sum + (s.produced || 0), 0); 
+      const pending = issued - received > 0 ? issued - received : 0;
+      
+      // If no batches, use demo values from INITIAL_DATA to keep it looking good
+      if (issued === 0) {
+        const demo = INITIAL_DATA.production.find(p => p.key === d.key);
+        return demo || { ...d, issued: 0, received: 0, pending: 0 };
+      }
+
+      return {
+        ...d,
+        issued,
+        received,
+        pending
+      };
+    });
+  }, [data]);
+
+  const handleCleanData = () => {
+    if (window.confirm("Are you sure you want to clean all data and reset to demo state?")) {
+      setData(INITIAL_DATA);
+      alert("Data cleaned and reset to demo state.");
+    }
+  };
+
   const handleGenerateImage = async () => {
     if (!aiPrompt.trim() || isGeneratingImage) return;
     setIsGeneratingImage(true);
@@ -466,9 +529,10 @@ export default function App() {
   const [isExportingToGoogle, setIsExportingToGoogle] = useState<string | null>(null);
   const [showGoogleImportModal, setShowGoogleImportModal] = useState<boolean>(false);
   const [importingType, setImportingType] = useState<string>('Batch Management');
-  const [spreadsheetId, setSpreadsheetId] = useState<string>('');
+  const [spreadsheetId, setSpreadsheetId] = useState<string>('https://docs.google.com/spreadsheets/d/1lZlx9ccTrpJoDsCdh0uAQ_o-PaEBKfXzt7d-eZWRFxQ/edit?gid=1444997506#gid=1444997506');
   const [isImporting, setIsImporting] = useState<boolean>(false);
   const [isBulkExporting, setIsBulkExporting] = useState<boolean>(false);
+  const [debugRedirectUri, setDebugRedirectUri] = useState<string>('');
 
   const DT = {
     get: (dn: string, key: string) => { try { return JSON.parse(localStorage.getItem('ki_dt_'+dn+'_'+key)||'[]') } catch(e){ return [] } },
@@ -501,7 +565,8 @@ export default function App() {
   const handleGoogleAuth = async () => {
     try {
       const res = await fetch('/api/auth/google/url');
-      const { url } = await res.json();
+      const { url, redirectUri } = await res.json();
+      setDebugRedirectUri(redirectUri);
       window.open(url, 'google_auth_popup', 'width=600,height=700');
     } catch (e) {
       console.error("Failed to get Google auth URL", e);
@@ -533,45 +598,50 @@ export default function App() {
       if (result.success && result.values) {
         const [headers, ...rows] = result.values;
         
+        const getCol = (name: string) => {
+          const idx = headers.findIndex((h: string) => h.toLowerCase().trim() === name.toLowerCase().trim());
+          return idx;
+        };
+
         // Simple mapping logic based on type
         if (importingType === 'Batch Management') {
           const newBatches = rows.map((row: any[]) => ({
             id: Math.random().toString(36).substr(2, 9),
-            lot_id: row[0] || '',
-            style: row[1] || '',
-            customer: row[2] || '',
-            color: row[3] || '',
-            qty: parseInt(row[4]) || 0,
-            stage: row[5] || 'Cutting',
-            status: row[6] || 'Active',
-            delivery: row[7] || new Date().toISOString().split('T')[0],
-            priority: row[8] || 'Medium',
+            lot_id: row[getCol('Lot ID')] || row[0] || '',
+            style: row[getCol('Style')] || row[1] || '',
+            customer: row[getCol('Customer')] || row[2] || '',
+            color: row[getCol('Color')] || row[3] || '',
+            qty: parseInt(row[getCol('Qty')] || row[4]) || 0,
+            stage: row[getCol('Stage')] || row[5] || 'Cutting',
+            status: row[getCol('Status')] || row[6] || 'Active',
+            delivery: row[getCol('Delivery')] || row[7] || new Date().toISOString().split('T')[0],
+            priority: row[getCol('Priority')] || row[8] || 'Medium',
           }));
           setData(prev => ({ ...prev, batches: [...newBatches, ...prev.batches] }));
         } else if (importingType === 'Fabric Purchase Register') {
           const newFabric = rows.map((row: any[]) => ({
             id: Math.random().toString(36).substr(2, 9),
-            date: row[0] || new Date().toISOString().split('T')[0],
-            challan: row[1] || '',
-            party: row[2] || '',
-            item: row[3] || '',
-            color: row[4] || '',
-            meter: parseFloat(row[5]) || 0,
-            rate: parseFloat(row[6]) || 0,
-            amount: parseFloat(row[7]) || 0,
-            status: row[8] || 'Pending',
+            date: row[getCol('Date')] || row[0] || new Date().toISOString().split('T')[0],
+            challan: row[getCol('Challan')] || row[1] || '',
+            party: row[getCol('Party')] || row[2] || '',
+            item: row[getCol('Item')] || row[3] || '',
+            color: row[getCol('Color')] || row[4] || '',
+            meter: parseFloat(row[getCol('Meter')] || row[5]) || 0,
+            rate: parseFloat(row[getCol('Rate')] || row[6]) || 0,
+            amount: parseFloat(row[getCol('Amount')] || row[7]) || 0,
+            status: row[getCol('Status')] || row[8] || 'Pending',
           }));
           setData(prev => ({ ...prev, fabric_purchase: [...newFabric, ...prev.fabric_purchase] }));
         } else if (importingType === 'Karigar Ledger') {
           const newKarigar = rows.map((row: any[]) => ({
             id: Math.random().toString(36).substr(2, 9),
-            date: row[0] || new Date().toISOString().split('T')[0],
-            name: row[1] || '',
-            work: row[2] || '',
-            debit: parseFloat(row[3]) || 0,
-            credit: parseFloat(row[4]) || 0,
-            balance: parseFloat(row[5]) || 0,
-            dept: row[6] || 'Stitching',
+            date: row[getCol('Date')] || row[0] || new Date().toISOString().split('T')[0],
+            name: row[getCol('Karigar Name')] || row[1] || '',
+            work: row[getCol('Work Description')] || row[2] || '',
+            debit: parseFloat(row[getCol('Debit')] || row[3]) || 0,
+            credit: parseFloat(row[getCol('Credit')] || row[4]) || 0,
+            balance: parseFloat(row[getCol('Balance')] || row[5]) || 0,
+            dept: row[getCol('Dept')] || row[6] || 'Stitching',
           }));
           setData(prev => ({ ...prev, karigar_ledger: [...newKarigar, ...prev.karigar_ledger] }));
         }
@@ -589,6 +659,142 @@ export default function App() {
     }
   };
 
+  const handleBulkImport = async () => {
+    let finalId = spreadsheetId;
+    if (spreadsheetId.includes('docs.google.com/spreadsheets/d/')) {
+      const match = spreadsheetId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (match && match[1]) {
+        finalId = match[1];
+      }
+    }
+
+    if (!finalId) {
+      alert("Please enter a Spreadsheet ID or URL");
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const res = await fetch('/api/google/sheets/import-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spreadsheetId: finalId }),
+      });
+      const result = await res.json();
+      
+      if (result.success && result.allData) {
+        const allData = result.allData;
+        const newData: any = { ...data };
+
+        const processSheet = (sheetName: string, dataKey: string, mapper: (row: any[], getCol: (n: string) => number) => any) => {
+          if (allData[sheetName] && allData[sheetName].length > 1) {
+            const [headers, ...rows] = allData[sheetName];
+            const getCol = (name: string) => {
+              const idx = headers.findIndex((h: string) => h && h.toLowerCase().trim() === name.toLowerCase().trim());
+              return idx;
+            };
+            // Skip header rows (some sheets have extra headers)
+            const actualRows = sheetName === 'Design Register' ? rows.slice(2) : rows.slice(1);
+            newData[dataKey] = actualRows.map((row: any[]) => mapper(row, getCol)).filter(Boolean);
+          }
+        };
+
+        // Define mappers for each module
+        processSheet('Batches', 'batches', (row, getCol) => ({
+          id: Math.random().toString(36).substr(2, 9),
+          lot_id: row[getCol('Lot ID')] || '',
+          style: row[getCol('Style')] || '',
+          customer: row[getCol('Customer')] || '',
+          color: row[getCol('Color')] || '',
+          qty: parseInt(row[getCol('Qty')]) || 0,
+          stage: row[getCol('Stage')] || 'Cutting',
+          status: row[getCol('Status')] || 'Active',
+          delivery: row[getCol('Delivery')] || new Date().toISOString().split('T')[0],
+          priority: row[getCol('Priority')] || 'Medium',
+        }));
+
+        processSheet('Fabric_Purchase', 'fabric_purchase', (row, getCol) => ({
+          id: Math.random().toString(36).substr(2, 9),
+          date: row[getCol('Date')] || new Date().toISOString().split('T')[0],
+          challan: row[getCol('Challan')] || '',
+          party: row[getCol('Party')] || '',
+          item: row[getCol('Item')] || '',
+          color: row[getCol('Color')] || '',
+          meter: parseFloat(row[getCol('Meter')]) || 0,
+          rate: parseFloat(row[getCol('Rate')]) || 0,
+          amount: parseFloat(row[getCol('Amount')]) || 0,
+          status: row[getCol('Status')] || 'Pending',
+        }));
+
+        processSheet('Karigar_Ledger', 'karigar_ledger', (row, getCol) => ({
+          id: Math.random().toString(36).substr(2, 9),
+          date: row[getCol('Date')] || new Date().toISOString().split('T')[0],
+          name: row[getCol('Karigar Name')] || '',
+          work: row[getCol('Work Description')] || '',
+          debit: parseFloat(row[getCol('Debit')]) || 0,
+          credit: parseFloat(row[getCol('Credit')]) || 0,
+          balance: parseFloat(row[getCol('Balance')]) || 0,
+          dept: row[getCol('Dept')] || 'Stitching',
+        }));
+
+        // Add more mappers as needed for other sheets...
+        // For now, let's just do the main ones and generic ones for others
+        const genericSheets = [
+          ['Design Register', 'design_register'],
+          ['Design_Master', 'design_master'],
+          ['Fabric_Issue', 'fabric_issue'],
+          ['Fabric_Stock', 'fabric_stock'],
+          ['Dyeing_Job', 'dyeing_job'],
+          ['Print_Job', 'print_job'],
+          ['Embroidery_Job', 'embroidery_job'],
+          ['Cutting_Job', 'cutting_job'],
+          ['Handwork_Job', 'handwork_job'],
+          ['Stitching_Job', 'stitching_job'],
+          ['Quality_Check', 'quality_check'],
+          ['Pressing', 'pressing'],
+          ['Challan', 'challan'],
+          ['Packing', 'packing'],
+          ['Customers', 'customers'],
+          ['GRN', 'grn'],
+          ['Issue_Material', 'issue_material'],
+          ['FG_Stock', 'fg_stock'],
+          ['Machines', 'machines'],
+          ['Karigar_Entries', 'karigar_entries'],
+          ['Payments', 'payments'],
+          ['GST_Invoices', 'gst_invoices']
+        ];
+
+        genericSheets.forEach(([sheetName, dataKey]) => {
+          if (!newData[dataKey] || newData[dataKey].length === 0) {
+            processSheet(sheetName, dataKey, (row, getCol) => {
+              const obj: any = { id: Math.random().toString(36).substr(2, 9) };
+              // Generic mapping: try to map common fields
+              if (getCol('Date') !== -1) obj.date = row[getCol('Date')];
+              if (getCol('Name') !== -1) obj.name = row[getCol('Name')];
+              if (getCol('Status') !== -1) obj.status = row[getCol('Status')];
+              // Fallback to first few columns if no headers match
+              if (Object.keys(obj).length === 1) {
+                row.forEach((val, i) => { obj[`col_${i}`] = val; });
+              }
+              return obj;
+            });
+          }
+        });
+
+        setData(newData);
+        alert("Successfully imported all sheets!");
+        setShowGoogleImportModal(false);
+      } else {
+        alert("Failed to import: " + (result.error || "Unknown error"));
+      }
+    } catch (e) {
+      console.error("Bulk import error", e);
+      alert("Bulk import failed. Check console for details.");
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleBulkExport = async () => {
     if (!isGoogleAuthenticated) {
       handleGoogleAuth();
@@ -597,44 +803,155 @@ export default function App() {
 
     setIsBulkExporting(true);
     try {
+      let finalId = spreadsheetId;
+      if (spreadsheetId.includes('docs.google.com/spreadsheets/d/')) {
+        const match = spreadsheetId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+          finalId = match[1];
+        }
+      }
+
       const datasets = [
+        {
+          sheetName: 'Design Register',
+          headers: ['Design ID', 'Design Name', 'Category', 'Status', 'Cost'],
+          rows: data.designs.map(d => [d.id, d.name, d.category, d.status, d.cost])
+        },
+        {
+          sheetName: 'Design_Master',
+          headers: ['Design ID', 'Design Name', 'Category', 'Status', 'Cost'],
+          rows: data.designs.map(d => [d.id, d.name, d.category, d.status, d.cost])
+        },
+        {
+          sheetName: 'Fabric_Purchase',
+          headers: ['Date', 'Challan', 'Party', 'Item', 'Color', 'Meter', 'Rate', 'Amount', 'Status'],
+          rows: data.fabric_purchase.map(f => [f.date, f.challan, f.party, f.item, f.color, f.meter, f.rate, f.amount, f.status])
+        },
+        {
+          sheetName: 'Fabric_Issue',
+          headers: ['Date', 'Lot ID', 'Item', 'Color', 'Meter', 'Status'],
+          rows: data.fabric_purchase.map(f => [f.date, 'LOT-XXX', f.item, f.color, f.meter, 'Issued'])
+        },
+        {
+          sheetName: 'Fabric_Stock',
+          headers: ['Item', 'Color', 'Total Meter', 'Available'],
+          rows: data.fabric_purchase.map(f => [f.item, f.color, f.meter, f.meter])
+        },
+        {
+          sheetName: 'Dyeing_Job',
+          headers: ['Date', 'Lot ID', 'Karigar', 'Issue Qty', 'Receive Qty', 'Status'],
+          rows: productionData.filter(p => p.key === 'dyeing').map(p => ['2026-04-01', 'LOT-201', 'Aslam Bhai', p.issued, p.received, 'In Progress'])
+        },
+        {
+          sheetName: 'Print_Job',
+          headers: ['Date', 'Lot ID', 'Karigar', 'Issue Qty', 'Receive Qty', 'Status'],
+          rows: productionData.filter(p => p.key === 'print').map(p => ['2026-04-01', 'LOT-201', 'Zubair', p.issued, p.received, 'In Progress'])
+        },
+        {
+          sheetName: 'Embroidery_Job',
+          headers: ['Date', 'Lot ID', 'Karigar', 'Issue Qty', 'Receive Qty', 'Status'],
+          rows: productionData.filter(p => p.key === 'embr').map(p => ['2026-04-01', 'LOT-201', 'Zubair', p.issued, p.received, 'In Progress'])
+        },
+        {
+          sheetName: 'Cutting_Job',
+          headers: ['Date', 'Lot ID', 'Karigar', 'Issue Qty', 'Receive Qty', 'Status'],
+          rows: productionData.filter(p => p.key === 'cutt').map(p => ['2026-04-01', 'LOT-201', 'Aslam Bhai', p.issued, p.received, 'In Progress'])
+        },
+        {
+          sheetName: 'Handwork_Job',
+          headers: ['Date', 'Lot ID', 'Karigar', 'Issue Qty', 'Receive Qty', 'Status'],
+          rows: productionData.filter(p => p.key === 'handwork').map(p => ['2026-04-01', 'LOT-201', 'Zubair', p.issued, p.received, 'In Progress'])
+        },
+        {
+          sheetName: 'Stitching_Job',
+          headers: ['Date', 'Lot ID', 'Karigar', 'Issue Qty (Pcs)', 'Receive Qty (Pcs)', 'Status'],
+          rows: productionData.filter(p => p.key === 'stitching').map(p => ['2026-04-01', 'LOT-201', 'Aslam Bhai', p.issued, p.received, 'In Progress'])
+        },
+        {
+          sheetName: 'Quality_Check',
+          headers: ['Date', 'Lot ID', 'Karigar', 'Issue Qty', 'Receive Qty', 'Status'],
+          rows: productionData.filter(p => p.key === 'qc').map(p => ['2026-04-01', 'LOT-201', 'Aslam Bhai', p.issued, p.received, 'In Progress'])
+        },
+        {
+          sheetName: 'Pressing',
+          headers: ['Date', 'Lot ID', 'Karigar', 'Issue Qty', 'Receive Qty', 'Status'],
+          rows: productionData.filter(p => p.key === 'pressing').map(p => ['2026-04-01', 'LOT-201', 'Aslam Bhai', p.issued, p.received, 'In Progress'])
+        },
+        {
+          sheetName: 'Karigar_Ledger',
+          headers: ['Date', 'Karigar Name', 'Work Description', 'Debit', 'Credit', 'Balance', 'Dept'],
+          rows: data.karigar_ledger.map(r => [r.date, r.name, r.work, r.debit, r.credit, r.balance, r.dept])
+        },
+        {
+          sheetName: 'Challan',
+          headers: ['Date', 'Challan No', 'Customer', 'Qty', 'Status'],
+          rows: [['2026-04-01', 'CH-501', 'Retail Chain A', 250, 'Dispatched']]
+        },
+        {
+          sheetName: 'Packing',
+          headers: ['Date', 'Lot ID', 'Qty', 'Status'],
+          rows: [['2026-04-01', 'LOT-201', 250, 'Packed']]
+        },
+        {
+          sheetName: 'Customers',
+          headers: ['ID', 'Name', 'Type', 'Mobile', 'City', 'Balance'],
+          rows: data.customers.map(c => [c.id, c.name, c.type, c.mobile, c.city, c.balance])
+        },
         {
           sheetName: 'Batches',
           headers: ['Lot ID', 'Style', 'Customer', 'Color', 'Qty', 'Stage', 'Status', 'Delivery', 'Priority'],
           rows: data.batches.map(b => [b.lot_id, b.style, b.customer, b.color, b.qty, b.stage, b.status, b.delivery, b.priority])
         },
         {
-          sheetName: 'Fabric',
-          headers: ['Date', 'Challan', 'Party', 'Item', 'Color', 'Meter', 'Rate', 'Amount', 'Status'],
-          rows: data.fabric_purchase.map(f => [f.date, f.challan, f.party, f.item, f.color, f.meter, f.rate, f.amount, f.status])
+          sheetName: 'GRN',
+          headers: ['Date', 'GRN No', 'Supplier', 'Item', 'Qty', 'Status'],
+          rows: data.grn.map(g => [g.date, g.grn_no, g.supplier, g.item, g.qty, g.status])
         },
         {
-          sheetName: 'Karigar',
-          headers: ['Date', 'Karigar Name', 'Work Description', 'Debit', 'Credit', 'Balance', 'Dept'],
-          rows: data.karigar_ledger.map(r => [r.date, r.name, r.work, r.debit, r.credit, r.balance, r.dept])
+          sheetName: 'Issue_Material',
+          headers: ['Date', 'Lot ID', 'Item', 'Qty'],
+          rows: [['2026-04-01', 'LOT-201', 'Cotton Silk', 500]]
         },
         {
-          sheetName: 'Designs',
-          headers: ['Design Name', 'Category', 'Status', 'Created At'],
-          rows: data.designs.map(d => [d.name, d.category, d.status, d.created_at])
+          sheetName: 'FG_Stock',
+          headers: ['Design', 'Color', 'Sizes', 'Produced', 'Dispatched', 'Balance', 'Status'],
+          rows: data.fg_stock.map(s => [s.design, s.color, s.sizes, s.produced, s.dispatched, s.balance, s.status])
         },
         {
-          sheetName: 'Customers',
-          headers: ['Name', 'Email', 'Phone', 'Address', 'Total Orders'],
-          rows: data.customers.map(c => [c.name, c.email, c.mobile, c.city, c.lifetime_value])
+          sheetName: 'Machines',
+          headers: ['Machine ID', 'Type', 'Status', 'Efficiency'],
+          rows: data.machines.map(m => [m.id, m.type, m.status, m.efficiency])
+        },
+        {
+          sheetName: 'Karigar_Entries',
+          headers: ['Date', 'Karigar', 'Lot ID', 'Qty', 'Rate', 'Amount'],
+          rows: [['2026-04-01', 'Aslam Bhai', 'LOT-201', 250, 50, 12500]]
+        },
+        {
+          sheetName: 'Payments',
+          headers: ['Date', 'Party', 'Amount', 'Method', 'Status'],
+          rows: data.payments.map(p => [p.date, p.party, p.amount, p.mode, p.status])
+        },
+        {
+          sheetName: 'GST_Invoices',
+          headers: ['Date', 'Invoice No', 'Customer', 'Amount', 'Tax', 'Total'],
+          rows: [['2026-04-01', 'INV-001', 'Retail Chain A', 100000, 18000, 118000]]
         }
       ];
 
       const res = await fetch('/api/google/sheets/export-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectName: 'KARNI IMPEX', datasets }),
+        body: JSON.stringify({ projectName: 'KARNI IMPEX', datasets, spreadsheetId: finalId }),
       });
       const result = await res.json();
       if (result.success) {
         window.open(result.url, '_blank');
       } else {
-        alert("Bulk export failed: " + result.error);
+        const errorMsg = result.error?.includes('API has not been used') 
+          ? "Google Sheets API is disabled. Please enable it in your Google Cloud Console."
+          : result.error;
+        alert("Bulk export failed: " + errorMsg);
       }
     } catch (e) {
       console.error("Bulk export error", e);
@@ -850,7 +1167,7 @@ export default function App() {
     );
   };
   const renderKPIs = () => {
-    const k = data.kpis;
+    const k = calculatedKpis;
     const kpiCards = [
       { id: 'designs', section: 'designs', label: 'Active Designs', value: k.total_designs, sub: 'In production', icon: Palette, color: 'text-amber-500', bg: 'bg-amber-500/10' },
       { id: 'qty', section: 'batches', label: 'Total Qty', value: k.total_qty.toLocaleString(), sub: 'Pieces', icon: Package, color: 'text-blue-500', bg: 'bg-blue-500/10' },
@@ -924,9 +1241,9 @@ export default function App() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <h3 className="text-lg font-bold text-slate-800 mb-4">Production Status — Issued vs Received</h3>
-          <div className="h-[300px]">
+          <div className="h-[300px] min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.production}>
+              <BarChart data={productionData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="dept" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
@@ -2681,7 +2998,7 @@ export default function App() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-bold text-slate-800 mb-4">Order Status Split</h3>
-            <div className="h-[300px]">
+            <div className="h-[300px] min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <RePieChart>
                   <Pie
@@ -2709,7 +3026,7 @@ export default function App() {
           </div>
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-bold text-slate-800 mb-4">Department Efficiency %</h3>
-            <div className="h-[300px]">
+            <div className="h-[300px] min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.production}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -2723,7 +3040,7 @@ export default function App() {
           </div>
           <div className="md:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-bold text-slate-800 mb-4">Production Pipeline Status — 7 Day Trend</h3>
-            <div className="h-[350px]">
+            <div className="h-[350px] min-h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={PIPELINE_TRENDS}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -4003,49 +4320,128 @@ export default function App() {
       );
       case 'importexport': return (
         <div className="space-y-6">
-          {/* Quick Sync Dashboard */}
-          <div className="bg-slate-900 rounded-2xl p-6 text-white overflow-hidden relative shadow-xl">
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
-                    <Globe className="w-6 h-6" />
+          {/* Main Sync Dashboard */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-8 bg-slate-900 text-white relative overflow-hidden">
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-blue-500/20 rounded-xl text-blue-400 border border-blue-500/30">
+                      <Globe className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold tracking-tight">Google Sheets Master Sync</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className={cn("w-2 h-2 rounded-full animate-pulse", isGoogleAuthenticated ? "bg-emerald-400" : "bg-slate-500")} />
+                        <span className="text-xs font-medium text-slate-400 uppercase tracking-widest">
+                          {isGoogleAuthenticated ? "Cloud Connected" : "Not Connected"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-bold">Direct Google Sheets Sync</h3>
+                  <p className="text-slate-400 text-sm max-w-lg leading-relaxed">
+                    Directly synchronize your entire KARNI ERP database with Google Sheets. 
+                    This creates a multi-tab spreadsheet with real-time data for all modules.
+                  </p>
+                  {debugRedirectUri && (
+                    <div className="mt-4 p-3 bg-slate-800/50 border border-slate-700 rounded-lg">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Copy this to Google Console (Redirect URI)</div>
+                      <div className="text-[10px] font-mono text-blue-400 break-all select-all">{debugRedirectUri}</div>
+                    </div>
+                  )}
                 </div>
-                <p className="text-slate-400 text-sm max-w-md">
-                  Sync your entire ERP data directly with Google Sheets. No files, no downloads—just direct cloud integration.
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                  {!isGoogleAuthenticated ? (
+                    <button 
+                      onClick={handleGoogleAuth}
+                      className="group bg-white text-slate-900 px-8 py-4 rounded-2xl font-bold text-base transition-all flex items-center justify-center gap-3 hover:bg-blue-50 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-white/5"
+                    >
+                      <Globe className="w-5 h-5 text-blue-600 group-hover:rotate-12 transition-transform" />
+                      Connect Google Account
+                    </button>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <button 
+                        onClick={handleBulkExport}
+                        disabled={isBulkExporting}
+                        className="group bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/50 text-white px-10 py-4 rounded-2xl font-bold text-base transition-all flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-emerald-500/20"
+                      >
+                        {isBulkExporting ? (
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Upload className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
+                        )}
+                        {isBulkExporting ? "Synchronizing..." : "Sync All to Google Sheets"}
+                      </button>
+                      
+                      <button 
+                        onClick={() => setShowGoogleImportModal(true)}
+                        className="bg-slate-800 hover:bg-slate-700 text-white px-8 py-4 rounded-2xl font-bold text-base transition-all flex items-center justify-center gap-3 border border-slate-700"
+                      >
+                        <Download className="w-5 h-5" />
+                        Import from Sheets
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Decorative background elements */}
+              <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 blur-[120px] -mr-48 -mt-48" />
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-600/5 blur-[100px] -ml-32 -mb-32" />
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-3">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Target Spreadsheet (URL or ID)</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={spreadsheetId}
+                    onChange={(e) => setSpreadsheetId(e.target.value)}
+                    placeholder="Paste Google Sheet URL or ID here..."
+                    className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  />
+                  <button 
+                    onClick={() => setSpreadsheetId('')}
+                    className="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-xl text-xs font-bold transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 italic">
+                  * If provided, the system will update this specific sheet instead of creating a new one.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3">
-                {!isGoogleAuthenticated ? (
-                  <button 
-                    onClick={handleGoogleAuth}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20"
-                  >
-                    <Globe className="w-4 h-4" /> Connect Google Account
-                  </button>
-                ) : (
-                  <>
-                    <button 
-                      onClick={handleBulkExport}
-                      disabled={isBulkExporting}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/20"
-                    >
-                      {isBulkExporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                      {isBulkExporting ? "Syncing..." : "Sync All to Google Sheets"}
-                    </button>
-                    <button 
-                      onClick={() => setShowGoogleImportModal(true)}
-                      className="bg-white text-slate-900 px-6 py-3 rounded-xl font-bold text-sm hover:bg-slate-100 transition-all flex items-center gap-2 shadow-lg shadow-white/10"
-                    >
-                      <Download className="w-4 h-4" /> Import from Sheets
-                    </button>
-                  </>
-                )}
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800">Automatic Formatting</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Headers are automatically bolded and styled.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm">
+                  <LayersIcon className="w-4 h-4 text-blue-500" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800">Multi-Tab Export</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Separate sheets for Batches, Fabric, Karigar, etc.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800">Live Sync</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">Data is pulled directly from your current ERP state.</p>
+                </div>
               </div>
             </div>
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 blur-[100px] -mr-32 -mt-32" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -4058,11 +4454,31 @@ export default function App() {
               </div>
               <div className="space-y-3">
                 {[
-                  'Batch Management',
                   'Design Register',
-                  'Fabric Purchase Register',
-                  'Karigar Ledger',
-                  'Customer Master'
+                  'Design_Master',
+                  'Fabric_Purchase',
+                  'Fabric_Issue',
+                  'Fabric_Stock',
+                  'Dyeing_Job',
+                  'Print_Job',
+                  'Embroidery_Job',
+                  'Cutting_Job',
+                  'Handwork_Job',
+                  'Stitching_Job',
+                  'Quality_Check',
+                  'Pressing',
+                  'Karigar_Ledger',
+                  'Challan',
+                  'Packing',
+                  'Customers',
+                  'Batches',
+                  'GRN',
+                  'Issue_Material',
+                  'FG_Stock',
+                  'Machines',
+                  'Karigar_Entries',
+                  'Payments',
+                  'GST_Invoices'
                 ].map(item => (
                   <div key={item} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 group hover:border-blue-200 transition-all">
                     <span className="text-sm font-medium text-slate-700">{item}</span>
@@ -4128,6 +4544,28 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm md:col-span-2">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-rose-50 rounded-lg">
+                    <Trash2 className="w-5 h-5 text-rose-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-800">System Maintenance</h3>
+                </div>
+                <button 
+                  onClick={handleCleanData}
+                  className="px-4 py-2 bg-rose-600 text-white text-sm font-bold rounded-lg hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Clean & Reset Data
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Use this option to clear all current entries and reset the application to its original demo state. 
+                This is useful for starting a fresh session or clearing imported test data.
+              </p>
             </div>
           </div>
         </div>
@@ -4338,7 +4776,7 @@ export default function App() {
           </div>
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h4 className="text-sm font-bold text-slate-800 mb-4">Sustainability Trends</h4>
-            <div className="h-[300px]">
+            <div className="h-[300px] min-h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.sustainability}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -4736,21 +5174,36 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-col gap-3">
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setShowGoogleImportModal(false)}
+                    className="flex-1 py-3 text-sm font-bold text-slate-500 hover:bg-slate-200 rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleGoogleImport}
+                    disabled={isImporting}
+                    className="flex-1 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
+                  >
+                    {isImporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileUp className="w-4 h-4" />}
+                    {isImporting ? "Importing..." : "Start Import"}
+                  </button>
+                </div>
+                
                 <button 
-                  onClick={() => setShowGoogleImportModal(false)}
-                  className="flex-1 py-2 text-sm font-bold text-slate-500 hover:bg-slate-200 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleGoogleImport}
+                  onClick={handleBulkImport}
                   disabled={isImporting}
-                  className="flex-1 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-emerald-500 text-white text-sm font-bold rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 border border-emerald-400"
                 >
-                  {isImporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileUp className="w-4 h-4" />}
-                  {isImporting ? "Importing..." : "Start Import"}
+                  {isImporting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LayersIcon className="w-4 h-4" />}
+                  {isImporting ? "Processing..." : "Bulk Import All Sheets"}
                 </button>
+                
+                <p className="text-[9px] text-slate-400 text-center italic">
+                  * Bulk import will update all modules based on sheet names.
+                </p>
               </div>
             </motion.div>
           </div>

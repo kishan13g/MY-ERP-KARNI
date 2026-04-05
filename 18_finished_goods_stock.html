@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finished Goods Stock | Karni Impex ERP v10</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f8; }
+  
+  .topbar {
+    background: #1e8449;
+    color: #fff;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .topbar h1 { font-size: 18px; font-weight: 600; }
+  .topbar small { font-size: 12px; opacity: 0.8; }
+  .nav-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.4);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    text-decoration: none;
+  }
+  .nav-btn:hover { background: rgba(255,255,255,0.3); }
+
+  .toolbar {
+    background: #fff;
+    padding: 10px 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+  }
+  .toolbar input {
+    padding: 7px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    width: 280px;
+  }
+  .btn {
+    padding: 7px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .btn-primary { background: #1e8449; color: #fff; }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-secondary { background: #e9ecef; color: #333; }
+  .btn-secondary:hover { background: #dee2e6; }
+
+  .content { padding: 16px 20px; }
+
+  .stats-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .stat-card {
+    background: #fff;
+    border-left: 4px solid #1e8449;
+    padding: 10px 18px;
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    min-width: 120px;
+  }
+  .stat-card .val { font-size: 22px; font-weight: 700; color: #1e8449; }
+  .stat-card .lbl { font-size: 11px; color: #777; margin-top: 2px; }
+
+  .table-wrap {
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+    overflow-x: auto;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 960px;
+    font-size: 13px;
+  }
+  thead tr {
+    background: #1e8449;
+    color: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  thead th {
+    padding: 10px 12px;
+    text-align: left;
+    white-space: nowrap;
+    font-weight: 600;
+    border-right: 1px solid rgba(255,255,255,0.15);
+    min-width: 80px;
+  }
+  tbody tr:nth-child(even) { background: #eafaf1; }
+  tbody tr:hover { background: #fffde7; }
+  tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    border-right: 1px solid #f0f0f0;
+    white-space: nowrap;
+  }
+  tbody td:first-child { font-weight: 500; }
+
+  .row-num { color: #aaa; font-size: 11px; text-align: center; }
+  
+  .footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 12px;
+    color: #999;
+  }
+
+  @media print {
+    .topbar, .toolbar, .stats-bar { display: none; }
+    .table-wrap { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>📋 Finished Goods Stock</h1>
+    <small>Karni Impex ERP v10 &nbsp;|&nbsp; GSTIN: 24AUOPD2833Q1Z9</small>
+  </div>
+  <a href="index.html" class="nav-btn">⬅ Home</a>
+</div>
+
+<div class="toolbar">
+  <input type="text" id="searchBox" placeholder="🔍 Search in Finished Goods Stock..." oninput="filterTable()" />
+  <button class="btn btn-primary" onclick="addRow()">➕ Add Row</button>
+  <button class="btn btn-secondary" onclick="window.print()">🖨 Print</button>
+  <button class="btn btn-secondary" onclick="exportCSV()">📥 Export CSV</button>
+  <span style="margin-left:auto;font-size:12px;color:#777;" id="rowCount">Rows: 14</span>
+</div>
+
+<div class="content">
+  <div class="stats-bar">
+    <div class="stat-card"><div class="val" id="totalRows">4</div><div class="lbl">Total Records</div></div>
+    <div class="stat-card"><div class="val" id="visibleRows">4</div><div class="lbl">Visible</div></div>
+    <div class="stat-card"><div class="val">12</div><div class="lbl">Columns</div></div>
+  </div>
+
+  <div class="table-wrap">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th class="row-num">#</th>
+          <th>Date</th><th>Design ID</th><th>Design Name</th><th>Category</th><th>Size</th><th>Qty In</th><th>Qty Out</th><th>Balance</th><th>Sale Price</th><th>Stock Value</th><th>Location</th><th>Remark</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td>16/04/2024</td><td>KI-D001</td><td>Floral Kurti A</td><td>Kurti</td><td>M</td><td>20</td><td>15</td><td>5</td><td>480</td><td>2400</td><td>Shelf A1</td><td></td></tr>
+<tr><td>16/04/2024</td><td>KI-D001</td><td>Floral Kurti A</td><td>Kurti</td><td>L</td><td>22</td><td>10</td><td>12</td><td>480</td><td>5760</td><td>Shelf A1</td><td></td></tr>
+<tr><td>16/04/2024</td><td>KI-D001</td><td>Floral Kurti A</td><td>Kurti</td><td>XL</td><td>15</td><td>15</td><td>0</td><td>480</td><td>0</td><td>Shelf A1</td><td>Sold Out</td></tr>
+<tr><td>16/04/2024</td><td>KI-D002</td><td>Straight Salwar B</td><td>Salwar</td><td>S</td><td>15</td><td>15</td><td>0</td><td>350</td><td>0</td><td>Shelf B1</td><td>Delivered</td></tr>
+
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="footer">Karni Impex ERP v10 &nbsp;|&nbsp; Finished Goods Stock &nbsp;|&nbsp; Surat, Gujarat</div>
+
+<script>
+const COLS = ['Date', 'Design ID', 'Design Name', 'Category', 'Size', 'Qty In', 'Qty Out', 'Balance', 'Sale Price', 'Stock Value', 'Location', 'Remark'];
+
+function filterTable() {
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  const rows = document.querySelectorAll('#tableBody tr');
+  let vis = 0;
+  rows.forEach(r => {
+    const match = r.textContent.toLowerCase().includes(q);
+    r.style.display = match ? '' : 'none';
+    if (match) vis++;
+  });
+  document.getElementById('visibleRows').textContent = vis;
+}
+
+function addRow() {
+  const tbody = document.getElementById('tableBody');
+  const rowNum = tbody.rows.length + 1;
+  const tr = document.createElement('tr');
+  let cells = `<td class="row-num">${rowNum}</td>`;
+  COLS.forEach(() => { cells += '<td contenteditable="true" style="background:#fffde7;"></td>'; });
+  tr.innerHTML = cells;
+  tbody.insertBefore(tr, tbody.firstChild);
+  document.getElementById('totalRows').textContent = parseInt(document.getElementById('totalRows').textContent) + 1;
+}
+
+function exportCSV() {
+  const rows = document.querySelectorAll('#mainTable tr');
+  let csv = '';
+  rows.forEach(r => {
+    const cells = r.querySelectorAll('th, td');
+    const row = Array.from(cells).map(c => '"' + c.textContent.replace(/"/g,'""') + '"').join(',');
+    csv += row + '\n';
+  });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '18_finished_goods_stock.csv';
+  a.click();
+}
+
+// Number rows on load
+window.onload = () => {
+  const rows = document.querySelectorAll('#tableBody tr');
+  rows.forEach((r, i) => {
+    const first = r.querySelector('td');
+    if (first) first.textContent = i + 1;
+  });
+};
+</script>
+</body>
+</html>

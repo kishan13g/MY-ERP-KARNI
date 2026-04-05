@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Karni Impex ERP v10 - All Sheets</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f8; }
+
+  .header {
+    background: linear-gradient(135deg, #8B1A1A 0%, #c0392b 100%);
+    color: #fff;
+    padding: 28px 32px;
+    text-align: center;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+  .header p { font-size: 14px; opacity: 0.85; }
+
+  .search-bar {
+    background: #fff;
+    padding: 14px 24px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .search-bar input {
+    padding: 9px 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 320px;
+  }
+  .search-bar span { font-size: 13px; color: #777; }
+
+  .content { padding: 20px 28px; max-width: 1400px; margin: 0 auto; }
+
+  .group { margin-bottom: 28px; }
+  .group-title {
+    font-size: 16px; font-weight: 700; color: #333;
+    margin-bottom: 12px; padding-bottom: 6px;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  .card-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .sheet-card {
+    background: #fff;
+    border-radius: 6px;
+    padding: 14px 18px;
+    min-width: 180px;
+    max-width: 220px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    cursor: pointer;
+    text-decoration: none;
+    color: #333;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .sheet-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.14);
+  }
+  .card-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #222; }
+  .card-cols { font-size: 11px; color: #999; }
+
+  .footer {
+    text-align: center;
+    padding: 20px;
+    font-size: 12px;
+    color: #aaa;
+  }
+
+  .total-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.25);
+    padding: 6px 16px;
+    border-radius: 20px;
+    margin-top: 10px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🏭 Karni Impex ERP v10</h1>
+  <p>GSTIN: 24AUOPD2833Q1Z9 &nbsp;|&nbsp; Surat, Gujarat &nbsp;|&nbsp; Women's Garment Manufacturing</p>
+  <div class="total-badge">35 Sheets</div>
+</div>
+
+<div class="search-bar">
+  <input type="text" id="searchSheet" placeholder="🔍 Search sheet name..." oninput="filterSheets()" />
+  <span id="sheetCount">35 sheets available</span>
+</div>
+
+<div class="content">
+  
+    <div class="group">
+      <div class="group-title">🏭 Production</div>
+      <div class="card-grid">
+        <a href="01_design_register.html" class="sheet-card" style="border-left:4px solid #8B1A1A;">
+          <div class="card-name">Design Register</div>
+          <div class="card-cols">17 columns</div>
+        </a>
+        <a href="02_design_master_card.html" class="sheet-card" style="border-left:4px solid #2c3e8c;">
+          <div class="card-name">Design Master Card</div>
+          <div class="card-cols">18 columns</div>
+        </a>
+        <a href="17_lot_control_tower.html" class="sheet-card" style="border-left:4px solid #8B1A1A;">
+          <div class="card-name">LOT Control Tower</div>
+          <div class="card-cols">18 columns</div>
+        </a>
+        <a href="27_sample_management.html" class="sheet-card" style="border-left:4px solid #8B1A1A;">
+          <div class="card-name">Sample Management</div>
+          <div class="card-cols">13 columns</div>
+        </a>
+        <a href="26_cutting_layout.html" class="sheet-card" style="border-left:4px solid #8B1A1A;">
+          <div class="card-name">Cutting Layout Calculator</div>
+          <div class="card-cols">10 columns</div>
+        </a>
+        <a href="30_design_pattern_board.html" class="sheet-card" style="border-left:4px solid #8B1A1A;">
+          <div class="card-name">Design Pattern Board</div>
+          <div class="card-cols">11 columns</div>
+        </a></div>
+    </div>
+    <div class="group">
+      <div class="group-title">🧵 Jobwork Sheets</div>
+      <div class="card-grid">
+        <a href="07_dyeing_job.html" class="sheet-card" style="border-left:4px solid #1a6b8a;">
+          <div class="card-name">Dyeing Job Sheet</div>
+          <div class="card-cols">13 columns</div>
+        </a>
+        <a href="08_printing_job.html" class="sheet-card" style="border-left:4px solid #117a65;">
+          <div class="card-name">Printing Job Sheet</div>
+          <div class="card-cols">14 columns</div>
+        </a>
+        <a href="09_embroidery_job.html" class="sheet-card" style="border-left:4px solid #7b241c;">
+          <div class="card-name">Embroidery Job Sheet</div>
+          <div class="card-cols">13 columns</div>
+        </a>
+        <a href="10_cutting_job.html" class="sheet-card" style="border-left:4px solid #1a5276;">
+          <div class="card-name">Cutting Job Sheet</div>
+          <div class="card-cols">13 columns</div>
+        </a>
+        <a href="11_handwork_job.html" class="sheet-card" style="border-left:4px solid #784212;">
+          <div class="card-name">Handwork Job Sheet</div>
+          <div class="card-cols">12 columns</div>
+        </a>
+        <a href="12_stitching_job.html" class="sheet-card" style="border-left:4px solid #1e8449;">
+          <div class="card-name">Stitching Job Sheet</div>
+          <div class="card-cols">13 columns</div>
+        </a>
+        <a href="13_qc_sheet.html" class="sheet-card" style="border-left:4px solid #0e6655;">
+          <div class="card-name">QC Inspection Sheet</div>
+          <div class="card-cols">13 columns</div>
+        </a>
+        <a href="14_pressing_job.html" class="sheet-card" style="border-left:4px solid #2c3e50;">
+          <div class="card-name">Pressing & Packing Sheet</div>
+          <div class="card-cols">10 columns</div>
+        </a></div>
+    </div>
+    <div class="group">
+      <div class="group-title">📦 Inventory</div>
+      <div class="card-grid">
+        <a href="04_fabric_purchase.html" class="sheet-card" style="border-left:4px solid #e67e22;">
+          <div class="card-name">Fabric Purchase</div>
+          <div class="card-cols">18 columns</div>
+        </a>
+        <a href="05_grn.html" class="sheet-card" style="border-left:4px solid #1e8449;">
+          <div class="card-name">GRN (Goods Receipt)</div>
+          <div class="card-cols">13 columns</div>
+        </a>
+        <a href="06_fabric_issue.html" class="sheet-card" style="border-left:4px solid #6c3483;">
+          <div class="card-name">Fabric Issue</div>
+          <div class="card-cols">15 columns</div>
+        </a>
+        <a href="18_finished_goods_stock.html" class="sheet-card" style="border-left:4px solid #1e8449;">
+          <div class="card-name">Finished Goods Stock</div>
+          <div class="card-cols">12 columns</div>
+        </a>
+        <a href="19_stock_transfer.html" class="sheet-card" style="border-left:4px solid #117a65;">
+          <div class="card-name">Stock Transfer</div>
+          <div class="card-cols">10 columns</div>
+        </a></div>
+    </div>
+    <div class="group">
+      <div class="group-title">👷 Karigar</div>
+      <div class="card-grid">
+        <a href="15_karigar_ledger.html" class="sheet-card" style="border-left:4px solid #e67e22;">
+          <div class="card-name">Karigar Ledger</div>
+          <div class="card-cols">15 columns</div>
+        </a>
+        <a href="16_karigar_master.html" class="sheet-card" style="border-left:4px solid #d35400;">
+          <div class="card-name">Karigar Master</div>
+          <div class="card-cols">13 columns</div>
+        </a>
+        <a href="31_karigar_advance.html" class="sheet-card" style="border-left:4px solid #e67e22;">
+          <div class="card-name">Karigar Advance</div>
+          <div class="card-cols">11 columns</div>
+        </a></div>
+    </div>
+    <div class="group">
+      <div class="group-title">💰 Finance</div>
+      <div class="card-grid">
+        <a href="20_sales_invoice.html" class="sheet-card" style="border-left:4px solid #8B1A1A;">
+          <div class="card-name">Sales / Invoice</div>
+          <div class="card-cols">19 columns</div>
+        </a>
+        <a href="21_customers.html" class="sheet-card" style="border-left:4px solid #6c3483;">
+          <div class="card-name">Customer Master</div>
+          <div class="card-cols">13 columns</div>
+        </a>
+        <a href="22_record_payment.html" class="sheet-card" style="border-left:4px solid #e67e22;">
+          <div class="card-name">Record Payment (Received)</div>
+          <div class="card-cols">11 columns</div>
+        </a>
+        <a href="23_accounts_receivable.html" class="sheet-card" style="border-left:4px solid #e67e22;">
+          <div class="card-name">Accounts Receivable Aging</div>
+          <div class="card-cols">8 columns</div>
+        </a>
+        <a href="24_vendor_payments.html" class="sheet-card" style="border-left:4px solid #e67e22;">
+          <div class="card-name">Vendor Payments</div>
+          <div class="card-cols">11 columns</div>
+        </a>
+        <a href="25_accounts_payable.html" class="sheet-card" style="border-left:4px solid #e67e22;">
+          <div class="card-name">Accounts Payable Aging</div>
+          <div class="card-cols">8 columns</div>
+        </a>
+        <a href="32_expense_register.html" class="sheet-card" style="border-left:4px solid #e67e22;">
+          <div class="card-name">Expense Register</div>
+          <div class="card-cols">11 columns</div>
+        </a>
+        <a href="33_bank_ledger.html" class="sheet-card" style="border-left:4px solid #e67e22;">
+          <div class="card-name">Bank Ledger</div>
+          <div class="card-cols">8 columns</div>
+        </a>
+        <a href="34_cash_ledger.html" class="sheet-card" style="border-left:4px solid #e67e22;">
+          <div class="card-name">Cash Ledger</div>
+          <div class="card-cols">7 columns</div>
+        </a>
+        <a href="35_profit_loss.html" class="sheet-card" style="border-left:4px solid #e67e22;">
+          <div class="card-name">Profit & Loss</div>
+          <div class="card-cols">9 columns</div>
+        </a></div>
+    </div>
+    <div class="group">
+      <div class="group-title">⚙️ Admin</div>
+      <div class="card-grid">
+        <a href="28_machine_management.html" class="sheet-card" style="border-left:4px solid #8B1A1A;">
+          <div class="card-name">Machine & Factor Management</div>
+          <div class="card-cols">11 columns</div>
+        </a>
+        <a href="29_user_role_management.html" class="sheet-card" style="border-left:4px solid #6c3483;">
+          <div class="card-name">User & Role Management</div>
+          <div class="card-cols">11 columns</div>
+        </a>
+        <a href="03_dashboard.html" class="sheet-card" style="border-left:4px solid #1a5276;">
+          <div class="card-name">Dashboard</div>
+          <div class="card-cols">6 columns</div>
+        </a></div>
+    </div>
+</div>
+
+<div class="footer">Karni Impex ERP v10 &nbsp;|&nbsp; All Sheets Index &nbsp;|&nbsp; Generated 04/04/2026</div>
+
+<script>
+function filterSheets() {
+  const q = document.getElementById('searchSheet').value.toLowerCase();
+  const cards = document.querySelectorAll('.sheet-card');
+  let vis = 0;
+  cards.forEach(c => {
+    const match = c.textContent.toLowerCase().includes(q);
+    c.style.display = match ? '' : 'none';
+    if (match) vis++;
+  });
+  document.getElementById('sheetCount').textContent = vis + ' sheets';
+}
+</script>
+</body>
+</html>

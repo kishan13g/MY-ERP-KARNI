@@ -1,29 +1,55 @@
+import "dotenv/config";
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { google } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
 import cookieParser from "cookie-parser";
-import dotenv from "dotenv";
+import cors from "cors";
+import { initDb } from "./src/db.ts";
+import authRoutes from "./src/routes/auth.ts";
+import productionRoutes from "./src/routes/production.ts";
+import inventoryRoutes from "./src/routes/inventory.ts";
 
-dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import fs from "fs";
 
 async function startServer() {
+  console.log("Starting server...");
   const app = express();
   const PORT = 3000;
 
+  // Liveness check for Cloud Run
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", time: new Date().toISOString() });
+  });
+
+  // Initialize Database
+  try {
+    initDb();
+    console.log("Database initialized.");
+  } catch (err) {
+    console.error("Database initialization failed:", err);
+  }
+
   app.use(express.json());
   app.use(cookieParser());
+  app.use(cors());
+
+  // KarniERP Core APIs
+  app.use("/api/auth", authRoutes);
+  app.use("/api/production", productionRoutes);
+  app.use("/api/inventory", inventoryRoutes);
 
   const oauth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    // Redirect URI will be constructed dynamically
   );
+
+  // Validate environment variables on startup
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.warn("âš ï¸ WARNING: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing in environment variables.");
+    console.warn("Google Sheets integration will not work until these are set in Settings > Secrets.");
+  }
 
   const SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
@@ -97,7 +123,7 @@ async function startServer() {
 
   // 3. Export to Google Sheets (Single Sheet)
   app.post("/api/google/sheets/export", async (req, res) => {
-    const { title, headers, rows } = req.body;
+    const { title, headers, rows, spreadsheetId: existingId } = req.body;
     const tokensCookie = req.cookies['google_tokens'];
 
     if (!tokensCookie) {
@@ -109,18 +135,38 @@ async function startServer() {
       oauth2Client.setCredentials(tokens);
 
       const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+      let spreadsheetId = existingId;
 
-      const spreadsheet = await sheets.spreadsheets.create({
-        requestBody: {
-          properties: { title: `${title} - ${new Date().toLocaleDateString()}` },
-        },
-      });
+      if (!spreadsheetId) {
+        const spreadsheet = await sheets.spreadsheets.create({
+          requestBody: {
+            properties: { title: `${title} - ${new Date().toLocaleDateString()}` },
+          },
+        });
+        spreadsheetId = spreadsheet.data.spreadsheetId;
+      } else if (spreadsheetId.includes('docs.google.com/spreadsheets/d/')) {
+        const match = spreadsheetId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) spreadsheetId = match[1];
+      }
 
-      const spreadsheetId = spreadsheet.data.spreadsheetId;
+      // Check if the specific sheet (tab) exists
+      const spreadsheetRes = await sheets.spreadsheets.get({ spreadsheetId });
+      const sheetName = title || 'Sheet1';
+      const existingSheet = spreadsheetRes.data.sheets?.find(s => s.properties?.title === sheetName);
+
+      if (!existingSheet && existingId) {
+        // Add tab if it doesn't exist in existing sheet
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            requests: [{ addSheet: { properties: { title: sheetName } } }]
+          }
+        });
+      }
 
       await sheets.spreadsheets.values.update({
         spreadsheetId: spreadsheetId!,
-        range: 'Sheet1!A1',
+        range: `${sheetName}!A1`,
         valueInputOption: 'RAW',
         requestBody: { values: [headers, ...rows] },
       });
@@ -317,18 +363,30 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  const isProduction = process.env.NODE_ENV === "production" || process.env.K_SERVICE;
+  
+  if (!isProduction) {
+    console.log("Starting in development mode with Vite...");
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
+    console.log("Starting in production mode...");
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      console.warn("CRITICAL: dist directory missing. Application may not serve frontend.");
+      app.get('*', (req, res) => {
+        res.status(404).send("Application build artifacts missing. Contact administrator.");
+      });
+    }
   }
 
   app.listen(PORT, "0.0.0.0", () => {
@@ -336,4 +394,7 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error("CRITICAL: Failed to start server:", err);
+  process.exit(1);
+});
